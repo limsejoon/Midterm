@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a home-use Next.js web app where a parent photographs a Korean-grammar workbook problem, an AI extracts it, generates concept-matched variant problems, and the child solves them on screen with grading and history tracked in Postgres.
+**Goal:** Build a home-use Next.js web app where a parent registers a workbook's concept list from its table of contents, then photographs individual grammar problems, has an AI extract and generate concept-matched variant problems, and the child solves them on screen with grading and history tracked in Postgres.
 
-**Architecture:** Next.js App Router on Vercel, using Server Actions for all mutations (no separate API routes). AI calls go through the Vercel AI Gateway via the `ai` package (`generateText` + `Output.object`/`Output.array`, not the deprecated `generateObject`). Data persists in Neon Postgres via Drizzle ORM. No auth, no image storage — only extracted structured data is kept.
+**Architecture:** Next.js App Router on Vercel, using Server Actions for all mutations (no separate API routes). AI calls go through the Vercel AI Gateway via the `ai` package (`generateText` + `Output.object`/`Output.array`, not the deprecated `generateObject`). Data persists in Neon Postgres via Drizzle ORM. No auth, no image storage — only extracted structured data is kept. The workbook's concept list is registered once (from its table of contents) so that every problem's grammar concept is picked from that fixed list instead of being freely reworded each time.
 
 **Tech Stack:** Next.js 16 (App Router, TypeScript, src dir), `ai` (AI SDK, v7, via Vercel AI Gateway), `drizzle-orm` + `drizzle-kit` + `@neondatabase/serverless` (Neon Postgres, `neon-http` driver), Vitest for unit tests, Tailwind CSS for styling.
 
@@ -17,6 +17,7 @@
 - Models are called through the Vercel AI Gateway using plain `"provider/model"` strings (e.g. `anthropic/claude-sonnet-5`), not a provider-specific SDK package.
 - Problem types are exactly one of `multiple_choice | short_answer | ox` everywhere (spec "데이터 모델").
 - Short-answer grading: normalized exact match first; only call the AI judge on mismatch; if the AI judge call fails, fall back to the exact-match result only (spec "에러 처리").
+- Concept names come from the pre-registered `concepts` list whenever possible — problem extraction is given the existing list and asked to reuse a matching name rather than invent a new one (spec "0. 목차로 개념 목록 미리 등록").
 
 ---
 
@@ -31,11 +32,13 @@ src/
     index.ts                -- getDb() lazy Drizzle client
   ai/
     models.ts                -- model id constants
-    extract-problem.ts        -- extractProblemFromImage()
+    extract-concepts.ts       -- extractConceptsFromImage()
+    extract-concepts.test.ts
+    extract-problem.ts         -- extractProblemFromImage()
     extract-problem.test.ts
-    generate-variants.ts       -- generateVariants()
+    generate-variants.ts        -- generateVariants()
     generate-variants.test.ts
-    grade-short-answer.ts       -- aiJudgeShortAnswer()
+    grade-short-answer.ts        -- aiJudgeShortAnswer()
     grade-short-answer.test.ts
   lib/
     grading.ts                -- normalizeAnswerText(), isExactMatch(), shuffleChoices()
@@ -46,9 +49,13 @@ src/
     stats.test.ts
   app/
     page.tsx                     -- home page with nav links
+    concepts/
+      new/
+        page.tsx                  -- client: upload TOC photo(s) -> editable list -> save
+        actions.ts                 -- extractConceptsFromImageAction, saveConceptsAction
     new-problem/
-      page.tsx                    -- client: upload -> confirm -> generating flow
-      actions.ts                   -- extractFromImageAction, saveProblemAction, generateVariantsForProblemAction
+      page.tsx                    -- client: upload -> confirm (concept dropdown) -> generating flow
+      actions.ts                   -- getConceptNamesAction, extractFromImageAction, saveProblemAction, generateVariantsForProblemAction
     practice/
       page.tsx                     -- list of unsolved variants
       [variantId]/
@@ -315,7 +322,7 @@ git commit -m "Add Neon Postgres + Drizzle schema"
 - Create: `src/lib/grading.test.ts`
 
 **Interfaces:**
-- Produces: `normalizeAnswerText(text: string): string`, `isExactMatch(correctAnswer: string, submittedAnswer: string): boolean`, `shuffleChoices<T>(items: T[]): T[]` — used by Task 6 (variant generation) and Task 7 (grade orchestration).
+- Produces: `normalizeAnswerText(text: string): string`, `isExactMatch(correctAnswer: string, submittedAnswer: string): boolean`, `shuffleChoices<T>(items: T[]): T[]` — used by Task 8 (variant generation) and Task 9 (grade orchestration).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -409,7 +416,7 @@ git commit -m "Add core answer normalization and shuffle logic"
 - Create: `src/ai/models.ts`
 
 **Interfaces:**
-- Produces: `EXTRACTION_MODEL`, `GENERATION_MODEL`, `GRADING_MODEL` string constants, consumed by Tasks 5, 6, 7.
+- Produces: `EXTRACTION_MODEL`, `GENERATION_MODEL`, `GRADING_MODEL` string constants, consumed by Tasks 5, 7, 8, 9.
 
 - [ ] **Step 1: Install the `ai` package**
 
@@ -453,7 +460,265 @@ git commit -m "Add AI Gateway model constants"
 
 ---
 
-### Task 5: Problem extraction from image (TDD)
+### Task 5: Table-of-contents concept extraction (TDD)
+
+**Files:**
+- Create: `src/ai/extract-concepts.ts`
+- Create: `src/ai/extract-concepts.test.ts`
+
+**Interfaces:**
+- Consumes: `EXTRACTION_MODEL` from `@/ai/models`.
+- Produces: `extractConceptsFromImage(imageBase64: string, mediaType: string): Promise<string[]>` — consumed by Task 6.
+
+- [ ] **Step 1: Write the failing test**
+
+```ts
+// src/ai/extract-concepts.test.ts
+import { describe, it, expect, vi } from 'vitest';
+
+vi.mock('ai', () => ({
+  generateText: vi.fn(),
+  Output: { array: vi.fn((config: unknown) => config) },
+}));
+
+import { generateText } from 'ai';
+import { extractConceptsFromImage } from './extract-concepts';
+
+describe('extractConceptsFromImage', () => {
+  it('returns the concept names extracted from the image', async () => {
+    vi.mocked(generateText).mockResolvedValue({
+      output: ['품사의 종류', '부사와 관형사 구분', '높임법'],
+    } as never);
+
+    const result = await extractConceptsFromImage('base64data', 'image/jpeg');
+
+    expect(result).toEqual(['품사의 종류', '부사와 관형사 구분', '높임법']);
+  });
+
+  it('sends the image as an image content part to the extraction model', async () => {
+    vi.mocked(generateText).mockResolvedValue({ output: [] } as never);
+
+    await extractConceptsFromImage('base64data', 'image/jpeg');
+
+    const call = vi.mocked(generateText).mock.calls[0][0] as {
+      model: string;
+      messages: Array<{ content: Array<{ type: string; image?: string; mediaType?: string }> }>;
+    };
+    expect(call.model).toBe('anthropic/claude-sonnet-5');
+    const imagePart = call.messages[0].content.find((p) => p.type === 'image');
+    expect(imagePart?.image).toBe('base64data');
+    expect(imagePart?.mediaType).toBe('image/jpeg');
+  });
+});
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `npm test -- extract-concepts`
+Expected: FAIL with "Cannot find module './extract-concepts'"
+
+- [ ] **Step 3: Implement**
+
+```ts
+// src/ai/extract-concepts.ts
+import { generateText, Output } from 'ai';
+import { z } from 'zod';
+import { EXTRACTION_MODEL } from './models';
+
+export async function extractConceptsFromImage(
+  imageBase64: string,
+  mediaType: string,
+): Promise<string[]> {
+  const { output } = await generateText({
+    model: EXTRACTION_MODEL,
+    output: Output.array({ element: z.string() }),
+    messages: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'text',
+            text: '이 이미지는 중학교 국어 문법 문제집의 목차입니다. 목차에 나온 단원/문법 개념 이름을 순서대로 배열로 추출해줘. 페이지 번호나 "제1장" 같은 장 번호는 빼고 개념 이름만 적어줘.',
+          },
+          { type: 'image', image: imageBase64, mediaType },
+        ],
+      },
+    ],
+  });
+  return output;
+}
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `npm test -- extract-concepts`
+Expected: PASS (2 tests)
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/ai/extract-concepts.ts src/ai/extract-concepts.test.ts
+git commit -m "Add AI-based concept list extraction from table of contents"
+```
+
+---
+
+### Task 6: Concept registration flow (목차 등록)
+
+**Files:**
+- Create: `src/app/concepts/new/actions.ts`
+- Create: `src/app/concepts/new/page.tsx`
+
+**Interfaces:**
+- Consumes: `extractConceptsFromImage` from `@/ai/extract-concepts`; `getDb` from `@/db`; `concepts` from `@/db/schema`.
+- Produces: page at `/concepts/new`. After this task, a parent can photograph a table of contents (across multiple photos if needed) and end up with a reviewed, de-duplicated concept list in the `concepts` table.
+
+- [ ] **Step 1: Write the server actions**
+
+```ts
+// src/app/concepts/new/actions.ts
+'use server';
+
+import { eq } from 'drizzle-orm';
+import { getDb } from '@/db';
+import { concepts } from '@/db/schema';
+import { extractConceptsFromImage } from '@/ai/extract-concepts';
+
+export async function extractConceptsFromImageAction(formData: FormData): Promise<string[]> {
+  const file = formData.get('image');
+  if (!(file instanceof File)) {
+    throw new Error('이미지 파일이 필요합니다.');
+  }
+  const arrayBuffer = await file.arrayBuffer();
+  const base64 = Buffer.from(arrayBuffer).toString('base64');
+  return extractConceptsFromImage(base64, file.type);
+}
+
+export async function saveConceptsAction(names: string[]): Promise<{ added: number }> {
+  const db = getDb();
+  let added = 0;
+  for (const rawName of names) {
+    const name = rawName.trim();
+    if (!name) continue;
+    const [existing] = await db.select().from(concepts).where(eq(concepts.name, name));
+    if (existing) continue;
+    await db.insert(concepts).values({ name });
+    added += 1;
+  }
+  return { added };
+}
+```
+
+- [ ] **Step 2: Write the page**
+
+```tsx
+// src/app/concepts/new/page.tsx
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { extractConceptsFromImageAction, saveConceptsAction } from './actions';
+
+export default function NewConceptsPage() {
+  const router = useRouter();
+  const [names, setNames] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBusy(true);
+    setError(null);
+    const formData = new FormData();
+    formData.set('image', file);
+    try {
+      const extracted = await extractConceptsFromImageAction(formData);
+      setNames((prev) => [...prev, ...extracted]);
+    } catch {
+      setError('인식에 실패했어요. 아래에서 직접 추가해주세요.');
+    } finally {
+      setBusy(false);
+      e.target.value = '';
+    }
+  }
+
+  function updateName(index: number, value: string) {
+    setNames((prev) => prev.map((n, i) => (i === index ? value : n)));
+  }
+
+  function removeName(index: number) {
+    setNames((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function handleSave() {
+    setBusy(true);
+    try {
+      await saveConceptsAction(names);
+      router.push('/new-problem');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <main className="mx-auto max-w-xl p-6">
+      <h1 className="mb-4 text-xl font-bold">목차로 개념 목록 등록</h1>
+      <p className="mb-4 text-sm text-gray-500">
+        목차 사진을 한 장씩 올려보세요. 여러 장을 올리면 목록에 계속 추가됩니다.
+      </p>
+
+      <input type="file" accept="image/*" capture="environment" onChange={handleFileChange} disabled={busy} />
+      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {busy && <p className="mt-2 text-sm text-gray-500">처리 중...</p>}
+
+      <ul className="mt-4 space-y-2">
+        {names.map((name, i) => (
+          <li key={i} className="flex gap-2">
+            <input className="flex-1 border p-2" value={name} onChange={(e) => updateName(i, e.target.value)} />
+            <button className="rounded border px-3" onClick={() => removeName(i)}>
+              삭제
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      <button className="mt-3 rounded border px-3 py-1" onClick={() => setNames((prev) => [...prev, ''])}>
+        + 직접 추가
+      </button>
+
+      <div className="mt-6">
+        <button
+          className="rounded bg-blue-600 px-4 py-2 text-white disabled:opacity-50"
+          onClick={handleSave}
+          disabled={busy || names.every((n) => !n.trim())}
+        >
+          저장
+        </button>
+      </div>
+    </main>
+  );
+}
+```
+
+- [ ] **Step 3: Manual verification**
+
+```bash
+npm run dev
+```
+
+Visit `http://localhost:3000/concepts/new`, upload a real photo of the workbook's table of contents, edit/remove/add entries as needed, save, and check in a DB client (or a quick `npm run db:push`-adjacent query) that the rows landed in `concepts` with no duplicates when saving twice.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add src/app/concepts
+git commit -m "Add table-of-contents concept registration flow"
+```
+
+---
+
+### Task 7: Problem extraction from image (TDD)
 
 **Files:**
 - Create: `src/ai/extract-problem.ts`
@@ -461,7 +726,7 @@ git commit -m "Add AI Gateway model constants"
 
 **Interfaces:**
 - Consumes: `EXTRACTION_MODEL` from `@/ai/models`.
-- Produces: `ExtractedProblem` type `{ conceptName: string; type: 'multiple_choice' | 'short_answer' | 'ox'; questionText: string; choices: string[] | null; correctAnswer: string }` and `extractProblemFromImage(imageBase64: string, mediaType: string): Promise<ExtractedProblem>` — consumed by Task 8.
+- Produces: `ExtractedProblem` type `{ conceptName: string; type: 'multiple_choice' | 'short_answer' | 'ox'; questionText: string; choices: string[] | null; correctAnswer: string }` and `extractProblemFromImage(imageBase64: string, mediaType: string, existingConcepts?: string[]): Promise<ExtractedProblem>` — consumed by Task 10.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -517,6 +782,27 @@ describe('extractProblemFromImage', () => {
     expect(imagePart?.image).toBe('base64data');
     expect(imagePart?.mediaType).toBe('image/jpeg');
   });
+
+  it('includes the existing concept list in the prompt when provided', async () => {
+    vi.mocked(generateText).mockResolvedValue({
+      output: {
+        conceptName: '높임법',
+        type: 'ox',
+        questionText: 'x',
+        choices: null,
+        correctAnswer: 'O',
+      },
+    } as never);
+
+    await extractProblemFromImage('base64data', 'image/jpeg', ['품사의 종류', '높임법']);
+
+    const call = vi.mocked(generateText).mock.calls[0][0] as {
+      messages: Array<{ content: Array<{ type: string; text?: string }> }>;
+    };
+    const textPart = call.messages[0].content.find((p) => p.type === 'text');
+    expect(textPart?.text).toContain('품사의 종류');
+    expect(textPart?.text).toContain('높임법');
+  });
 });
 ```
 
@@ -534,7 +820,9 @@ import { z } from 'zod';
 import { EXTRACTION_MODEL } from './models';
 
 export const extractedProblemSchema = z.object({
-  conceptName: z.string().describe('이 문제가 테스트하는 문법 개념 (예: "부사와 관형사 구분")'),
+  conceptName: z
+    .string()
+    .describe('이 문제가 테스트하는 문법 개념. 등록된 개념 목록 중 하나와 맞으면 그 이름을 정확히 그대로 사용'),
   type: z.enum(['multiple_choice', 'short_answer', 'ox']),
   questionText: z.string(),
   choices: z.array(z.string()).nullable().describe('객관식일 때만 보기 배열, 아니면 null'),
@@ -546,7 +834,13 @@ export type ExtractedProblem = z.infer<typeof extractedProblemSchema>;
 export async function extractProblemFromImage(
   imageBase64: string,
   mediaType: string,
+  existingConcepts: string[] = [],
 ): Promise<ExtractedProblem> {
+  const conceptListText =
+    existingConcepts.length > 0
+      ? `\n\n이미 등록된 문법 개념 목록: ${existingConcepts.join(', ')}\n이 문제가 목록 중 하나에 해당하면 그 이름을 정확히 그대로 사용하고, 맞는 게 없을 때만 새로운 이름을 만들어줘.`
+      : '';
+
   const { output } = await generateText({
     model: EXTRACTION_MODEL,
     output: Output.object({ schema: extractedProblemSchema }),
@@ -556,7 +850,7 @@ export async function extractProblemFromImage(
         content: [
           {
             type: 'text',
-            text: '이 이미지는 중학교 국어 문법 문제집의 한 문제입니다. 문제 텍스트, 보기(있다면), 정답, 이 문제가 테스트하는 문법 개념을 추출해줘.',
+            text: `이 이미지는 중학교 국어 문법 문제집의 한 문제입니다. 문제 텍스트, 보기(있다면), 정답, 이 문제가 테스트하는 문법 개념을 추출해줘.${conceptListText}`,
           },
           { type: 'image', image: imageBase64, mediaType },
         ],
@@ -570,7 +864,7 @@ export async function extractProblemFromImage(
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `npm test -- extract-problem`
-Expected: PASS (2 tests)
+Expected: PASS (3 tests)
 
 - [ ] **Step 5: Commit**
 
@@ -581,7 +875,7 @@ git commit -m "Add AI-based problem extraction from photographed workbook page"
 
 ---
 
-### Task 6: Variant generation (TDD)
+### Task 8: Variant generation (TDD)
 
 **Files:**
 - Create: `src/ai/generate-variants.ts`
@@ -589,7 +883,7 @@ git commit -m "Add AI-based problem extraction from photographed workbook page"
 
 **Interfaces:**
 - Consumes: `GENERATION_MODEL` from `@/ai/models`, `shuffleChoices` from `@/lib/grading`.
-- Produces: `GeneratedVariant` type `{ type: 'multiple_choice' | 'short_answer' | 'ox'; questionText: string; choices: string[] | null; correctAnswer: string }` and `generateVariants(params: { conceptName: string; originalQuestionText: string; originalType: 'multiple_choice' | 'short_answer' | 'ox'; count: number }): Promise<GeneratedVariant[]>` — consumed by Task 8.
+- Produces: `GeneratedVariant` type `{ type: 'multiple_choice' | 'short_answer' | 'ox'; questionText: string; choices: string[] | null; correctAnswer: string }` and `generateVariants(params: { conceptName: string; originalQuestionText: string; originalType: 'multiple_choice' | 'short_answer' | 'ox'; count: number }): Promise<GeneratedVariant[]>` — consumed by Task 10.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -727,7 +1021,7 @@ git commit -m "Add AI-based variant problem generation"
 
 ---
 
-### Task 7: AI-judged short-answer grading + orchestration (TDD)
+### Task 9: AI-judged short-answer grading + orchestration (TDD)
 
 **Files:**
 - Create: `src/ai/grade-short-answer.ts`
@@ -737,7 +1031,7 @@ git commit -m "Add AI-based variant problem generation"
 
 **Interfaces:**
 - Consumes: `GRADING_MODEL` from `@/ai/models`, `isExactMatch` from `@/lib/grading`.
-- Produces: `aiJudgeShortAnswer(params: { conceptName: string; questionText: string; correctAnswer: string; submittedAnswer: string }): Promise<boolean>`; `GradeResult` type `{ isCorrect: boolean; gradedBy: 'exact' | 'ai_judged' }` and `gradeAttempt(params: { type: 'multiple_choice' | 'short_answer' | 'ox'; conceptName: string; questionText: string; correctAnswer: string; submittedAnswer: string }): Promise<GradeResult>` — consumed by Task 9.
+- Produces: `aiJudgeShortAnswer(params: { conceptName: string; questionText: string; correctAnswer: string; submittedAnswer: string }): Promise<boolean>`; `GradeResult` type `{ isCorrect: boolean; gradedBy: 'exact' | 'ai_judged' }` and `gradeAttempt(params: { type: 'multiple_choice' | 'short_answer' | 'ox'; conceptName: string; questionText: string; correctAnswer: string; submittedAnswer: string }): Promise<GradeResult>` — consumed by Task 11.
 
 - [ ] **Step 1: Write the failing test for the AI judge**
 
@@ -947,7 +1241,7 @@ git commit -m "Add AI-judged short-answer grading and grade orchestration"
 
 ---
 
-### Task 8: New-problem flow (upload → confirm → generate)
+### Task 10: New-problem flow (upload → confirm → generate)
 
 **Files:**
 - Create: `src/app/new-problem/actions.ts`
@@ -955,7 +1249,7 @@ git commit -m "Add AI-judged short-answer grading and grade orchestration"
 
 **Interfaces:**
 - Consumes: `extractProblemFromImage`, `ExtractedProblem` from `@/ai/extract-problem`; `generateVariants` from `@/ai/generate-variants`; `getDb` from `@/db`; `concepts`, `problems`, `variants` from `@/db/schema`.
-- Produces: page at `/new-problem`. After this task, a parent can go from a photo to saved variants in the DB.
+- Produces: page at `/new-problem`. After this task, a parent can go from a photo to saved variants in the DB, picking the grammar concept from the list registered in Task 6.
 
 - [ ] **Step 1: Write the server actions**
 
@@ -971,14 +1265,23 @@ import { generateVariants } from '@/ai/generate-variants';
 
 const VARIANT_COUNT = 3;
 
+export async function getConceptNamesAction(): Promise<string[]> {
+  const db = getDb();
+  const rows = await db.select({ name: concepts.name }).from(concepts);
+  return rows.map((r) => r.name);
+}
+
 export async function extractFromImageAction(formData: FormData): Promise<ExtractedProblem> {
   const file = formData.get('image');
   if (!(file instanceof File)) {
     throw new Error('이미지 파일이 필요합니다.');
   }
+  const db = getDb();
+  const existingConcepts = (await db.select({ name: concepts.name }).from(concepts)).map((r) => r.name);
+
   const arrayBuffer = await file.arrayBuffer();
   const base64 = Buffer.from(arrayBuffer).toString('base64');
-  return extractProblemFromImage(base64, file.type);
+  return extractProblemFromImage(base64, file.type, existingConcepts);
 }
 
 export async function saveProblemAction(
@@ -1036,15 +1339,16 @@ export async function generateVariantsForProblemAction(problemId: number): Promi
 }
 ```
 
-- [ ] **Step 2: Write the page (client component, 3-step flow)**
+- [ ] **Step 2: Write the page (client component, 3-step flow with a concept dropdown)**
 
 ```tsx
 // src/app/new-problem/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
+  getConceptNamesAction,
   extractFromImageAction,
   saveProblemAction,
   generateVariantsForProblemAction,
@@ -1070,6 +1374,12 @@ export default function NewProblemPage() {
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [problemId, setProblemId] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
+  const [conceptOptions, setConceptOptions] = useState<string[]>([]);
+  const [useNewConceptInput, setUseNewConceptInput] = useState(false);
+
+  useEffect(() => {
+    getConceptNamesAction().then(setConceptOptions);
+  }, []);
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -1081,9 +1391,11 @@ export default function NewProblemPage() {
     try {
       const extracted = await extractFromImageAction(formData);
       setDraft(extracted);
+      setUseNewConceptInput(!conceptOptions.includes(extracted.conceptName));
     } catch {
       setExtractError('인식에 실패했어요. 아래 폼에 직접 입력해주세요.');
       setDraft(emptyDraft);
+      setUseNewConceptInput(true);
     } finally {
       setStep('confirm');
       setBusy(false);
@@ -1129,11 +1441,41 @@ export default function NewProblemPage() {
 
           <label className="block">
             <span className="text-sm">문법 개념</span>
-            <input
-              className="w-full border p-2"
-              value={draft.conceptName}
-              onChange={(e) => setDraft({ ...draft, conceptName: e.target.value })}
-            />
+            {useNewConceptInput ? (
+              <div className="flex gap-2">
+                <input
+                  className="flex-1 border p-2"
+                  value={draft.conceptName}
+                  onChange={(e) => setDraft({ ...draft, conceptName: e.target.value })}
+                />
+                {conceptOptions.length > 0 && (
+                  <button type="button" className="rounded border px-3" onClick={() => setUseNewConceptInput(false)}>
+                    목록에서 선택
+                  </button>
+                )}
+              </div>
+            ) : (
+              <select
+                className="w-full border p-2"
+                value={draft.conceptName}
+                onChange={(e) => {
+                  if (e.target.value === '__new__') {
+                    setUseNewConceptInput(true);
+                    setDraft({ ...draft, conceptName: '' });
+                  } else {
+                    setDraft({ ...draft, conceptName: e.target.value });
+                  }
+                }}
+              >
+                <option value="">선택하세요</option>
+                {conceptOptions.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+                <option value="__new__">+ 새 개념 추가</option>
+              </select>
+            )}
           </label>
 
           <label className="block">
@@ -1227,23 +1569,24 @@ export default function NewProblemPage() {
 npm run dev
 ```
 
-Visit `http://localhost:3000/new-problem`, upload a real photo of a workbook problem, confirm/edit the extracted fields, save, and confirm it redirects to `/practice` once variants finish generating (built in Task 9 — until then it will 404, which is expected at this point).
+Visit `http://localhost:3000/new-problem`, upload a real photo of a workbook problem, confirm the concept dropdown is pre-filled with a matching registered concept when there is one (from Task 6), edit any other fields, save, and confirm it redirects to `/practice` once variants finish generating (built in Task 11 — until then it will 404, which is expected at this point).
 
 - [ ] **Step 4: Commit**
 
 ```bash
 git add src/app/new-problem
-git commit -m "Add new-problem upload/confirm/generate flow"
+git commit -m "Add new-problem upload/confirm/generate flow with concept matching"
 ```
 
 ---
 
-### Task 9: Practice list + solve page
+### Task 11: Practice list + solve page
 
 **Files:**
 - Create: `src/app/practice/page.tsx`
 - Create: `src/app/practice/[variantId]/actions.ts`
 - Create: `src/app/practice/[variantId]/page.tsx`
+- Create: `src/app/practice/[variantId]/solve-form.tsx`
 
 **Interfaces:**
 - Consumes: `getDb` from `@/db`; `variants`, `attempts`, `concepts` from `@/db/schema`; `gradeAttempt` from `@/lib/grade-attempt`.
@@ -1335,7 +1678,7 @@ export async function submitAnswerAction(
 }
 ```
 
-- [ ] **Step 3: Write the solve page**
+- [ ] **Step 3: Write the solve page and its form**
 
 ```tsx
 // src/app/practice/[variantId]/page.tsx
@@ -1482,7 +1825,7 @@ git commit -m "Add practice list and solve pages"
 
 ---
 
-### Task 10: History / stats page (TDD for the aggregation logic)
+### Task 12: History / stats page (TDD for the aggregation logic)
 
 **Files:**
 - Create: `src/lib/stats.ts`
@@ -1638,13 +1981,13 @@ git commit -m "Add history and concept-accuracy stats page"
 
 ---
 
-### Task 11: Home page + navigation
+### Task 13: Home page + navigation
 
 **Files:**
 - Modify: `src/app/page.tsx` (replace the default scaffold content)
 
 **Interfaces:**
-- Produces: `/` with links to `/new-problem`, `/practice`, `/history`.
+- Produces: `/` with links to `/concepts/new`, `/new-problem`, `/practice`, `/history`.
 
 - [ ] **Step 1: Replace the home page**
 
@@ -1657,6 +2000,9 @@ export default function Home() {
     <main className="mx-auto max-w-xl p-6">
       <h1 className="mb-6 text-2xl font-bold">국어 문법 대체 문제</h1>
       <nav className="flex flex-col gap-3">
+        <Link href="/concepts/new" className="rounded border p-4 hover:bg-gray-50">
+          목차로 개념 목록 등록
+        </Link>
         <Link href="/new-problem" className="rounded border p-4 hover:bg-gray-50">
           새 문제 등록
         </Link>
@@ -1678,7 +2024,7 @@ export default function Home() {
 npm run dev
 ```
 
-Visit `http://localhost:3000/`, confirm all three links work.
+Visit `http://localhost:3000/`, confirm all four links work.
 
 - [ ] **Step 3: Commit**
 
@@ -1689,7 +2035,7 @@ git commit -m "Add home page navigation"
 
 ---
 
-### Task 12: Deploy to Vercel + full end-to-end check
+### Task 14: Deploy to Vercel + full end-to-end check
 
 **Files:** none (deployment + verification only)
 
@@ -1709,12 +2055,12 @@ vercel deploy --prod
 
 - [ ] **Step 3: Full manual walkthrough on the deployed URL**
 
-From a phone, using the deployed URL:
-1. Go to `새 문제 등록`, photograph a real page from the middle-schooler's grammar workbook.
-2. Confirm the extracted concept/question/choices/answer are correct (edit if the AI misread anything).
+From a phone, using the deployed URL, with the actual workbook the app is built around:
+1. Go to `목차로 개념 목록 등록`, photograph the workbook's table of contents (one or more pages), review/edit the extracted concept list, and save.
+2. Go to `새 문제 등록`, photograph a real problem page. Confirm the extracted concept/question/choices/answer are correct, and that the concept dropdown picked (or closely matches) one of the concepts registered in step 1 — edit if the AI misread anything or the concept doesn't match.
 3. Save, wait for variant generation to finish, confirm it lands on `/practice` with new problems listed.
 4. Solve at least one of each type that appears (객관식/단답형/OX) and confirm grading looks right, including a deliberately "close but not exact" short-answer to confirm the AI judge kicks in.
-5. Check `/history` shows the attempts and a sensible accuracy percentage.
+5. Check `/history` shows the attempts and a sensible accuracy percentage, grouped under the concept names from step 1.
 
 - [ ] **Step 4: Commit any fixes found during the walkthrough, then stop**
 
