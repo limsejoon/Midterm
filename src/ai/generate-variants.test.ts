@@ -35,7 +35,7 @@ describe('generateVariants', () => {
     });
 
     expect(result).toHaveLength(2);
-    expect(result[0].choices?.slice().sort()).toEqual(sampleVariants[0].choices.slice().sort());
+    expect(result[0].choices?.slice().sort()).toEqual(sampleVariants[0].choices!.slice().sort());
     expect(result[0].correctAnswer).toBe('새');
     expect(result[1].choices).toBeNull();
   });
@@ -50,7 +50,7 @@ describe('generateVariants', () => {
       count: 2,
     });
 
-    const call = vi.mocked(generateText).mock.calls[0][0] as {
+    const call = vi.mocked(generateText).mock.calls[0][0] as unknown as {
       model: string;
       output: { element: unknown; minItems: number; maxItems: number };
     };
