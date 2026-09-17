@@ -1,0 +1,64 @@
+import {
+  pgTable,
+  pgEnum,
+  serial,
+  integer,
+  text,
+  varchar,
+  jsonb,
+  boolean,
+  timestamp,
+} from 'drizzle-orm/pg-core';
+
+export const problemTypeEnum = pgEnum('problem_type', [
+  'multiple_choice',
+  'short_answer',
+  'ox',
+]);
+
+export const gradedByEnum = pgEnum('graded_by', ['exact', 'ai_judged']);
+
+export const concepts = pgTable('concepts', {
+  id: serial('id').primaryKey(),
+  name: varchar('name', { length: 255 }).notNull().unique(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const problems = pgTable('problems', {
+  id: serial('id').primaryKey(),
+  conceptId: integer('concept_id')
+    .notNull()
+    .references(() => concepts.id),
+  type: problemTypeEnum('type').notNull(),
+  questionText: text('question_text').notNull(),
+  choices: jsonb('choices').$type<string[] | null>(),
+  correctAnswer: text('correct_answer').notNull(),
+  sourceNote: varchar('source_note', { length: 255 }),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const variants = pgTable('variants', {
+  id: serial('id').primaryKey(),
+  problemId: integer('problem_id')
+    .notNull()
+    .references(() => problems.id),
+  conceptId: integer('concept_id')
+    .notNull()
+    .references(() => concepts.id),
+  type: problemTypeEnum('type').notNull(),
+  questionText: text('question_text').notNull(),
+  choices: jsonb('choices').$type<string[] | null>(),
+  correctAnswer: text('correct_answer').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const attempts = pgTable('attempts', {
+  id: serial('id').primaryKey(),
+  variantId: integer('variant_id')
+    .notNull()
+    .references(() => variants.id),
+  submittedAnswer: text('submitted_answer').notNull(),
+  isCorrect: boolean('is_correct').notNull(),
+  gradedBy: gradedByEnum('graded_by').notNull(),
+  solvedAt: timestamp('solved_at').notNull().defaultNow(),
+});
