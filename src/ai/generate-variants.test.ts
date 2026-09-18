@@ -7,6 +7,7 @@ vi.mock('ai', () => ({
 
 import { generateText } from 'ai';
 import { generateVariants } from './generate-variants';
+import { GENERATION_MODEL } from './models';
 
 const sampleVariants = [
   {
@@ -51,10 +52,10 @@ describe('generateVariants', () => {
     });
 
     const call = vi.mocked(generateText).mock.calls[0][0] as unknown as {
-      model: string;
+      model: unknown;
       output: { element: unknown; minItems: number; maxItems: number };
     };
-    expect(call.model).toBe('anthropic/claude-sonnet-5');
+    expect(call.model).toBe(GENERATION_MODEL);
     expect(call.output.minItems).toBe(2);
     expect(call.output.maxItems).toBe(2);
   });

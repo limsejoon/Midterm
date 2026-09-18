@@ -7,6 +7,7 @@ vi.mock('ai', () => ({
 
 import { generateText } from 'ai';
 import { extractProblemFromImage } from './extract-problem';
+import { EXTRACTION_MODEL } from './models';
 
 describe('extractProblemFromImage', () => {
   it('returns the structured object extracted by the model', async () => {
@@ -40,10 +41,10 @@ describe('extractProblemFromImage', () => {
     await extractProblemFromImage('base64data', 'image/jpeg');
 
     const call = vi.mocked(generateText).mock.calls[0][0] as {
-      model: string;
+      model: unknown;
       messages: Array<{ content: Array<{ type: string; image?: string; mediaType?: string }> }>;
     };
-    expect(call.model).toBe('anthropic/claude-sonnet-5');
+    expect(call.model).toBe(EXTRACTION_MODEL);
     const imagePart = call.messages[0].content.find((p) => p.type === 'image');
     expect(imagePart?.image).toBe('base64data');
     expect(imagePart?.mediaType).toBe('image/jpeg');

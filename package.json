@@ -12,6 +12,7 @@
     "db:generate": "dotenv -e .env.local -- drizzle-kit generate"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.57",
     "@neondatabase/serverless": "^1.1.0",
     "ai": "^7.0.105",
     "drizzle-orm": "^0.45.2",
