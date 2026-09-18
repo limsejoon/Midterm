@@ -2,11 +2,9 @@ import { readFileSync } from 'fs';
 import { eq, and } from 'drizzle-orm';
 import { getDb } from '../src/db';
 import { books, concepts, problems, variants } from '../src/db/schema';
-import { generateVariants } from '../src/ai/generate-variants';
 
 const BOOK_NAME = '빠작 중등문법';
-const REFERENCE_FILE = 'content/ppajak-grammar/01-moeum-chegye.json';
-const VARIANT_COUNT = 3;
+const REFERENCE_FILE = process.argv[2] ?? 'content/ppajak-grammar/01-moeum-chegye.json';
 
 type ReferenceProblem = {
   number: number;
@@ -22,6 +20,10 @@ type ReferenceFile = {
   referenceProblems: ReferenceProblem[];
 };
 
+// Inserts the verified reference problems as `problems` rows, and also as
+// their own `variants` row (identical content) so they're solvable right
+// away. AI-generated variants are a separate, later step — see
+// scripts/seed-variants.ts.
 async function main() {
   const db = getDb();
   const data = JSON.parse(readFileSync(REFERENCE_FILE, 'utf8')) as ReferenceFile;
@@ -35,8 +37,7 @@ async function main() {
     .where(and(eq(concepts.bookId, book.id), eq(concepts.name, data.concept)));
   if (!concept) throw new Error(`개념을 찾을 수 없습니다: "${data.concept}"`);
 
-  let problemsAdded = 0;
-  let variantsAdded = 0;
+  let added = 0;
 
   for (const ref of data.referenceProblems) {
     const [problem] = await db
@@ -50,31 +51,21 @@ async function main() {
         sourceNote: `${data.sourceNote} - ${ref.number}번`,
       })
       .returning();
-    problemsAdded += 1;
 
-    const generated = await generateVariants({
-      conceptName: concept.name,
-      originalQuestionText: ref.questionText,
-      originalType: ref.type,
-      count: VARIANT_COUNT,
+    await db.insert(variants).values({
+      problemId: problem.id,
+      conceptId: concept.id,
+      type: problem.type,
+      questionText: problem.questionText,
+      choices: problem.choices,
+      correctAnswer: problem.correctAnswer,
     });
 
-    await db.insert(variants).values(
-      generated.map((v) => ({
-        problemId: problem.id,
-        conceptId: concept.id,
-        type: v.type,
-        questionText: v.questionText,
-        choices: v.choices,
-        correctAnswer: v.correctAnswer,
-      })),
-    );
-    variantsAdded += generated.length;
-
-    console.log(`  ${ref.number}번 → problem #${problem.id}, variant ${generated.length}개 생성`);
+    added += 1;
+    console.log(`  ${ref.number}번 → problem #${problem.id} (바로 풀 수 있음)`);
   }
 
-  console.log(`\n완료: problems ${problemsAdded}개, variants ${variantsAdded}개 추가 (개념: "${concept.name}")`);
+  console.log(`\n완료: 기본 문제 ${added}개 추가 (개념: "${concept.name}"). 변형 문제는 scripts/seed-variants.ts로 나중에 추가.`);
 }
 
 main().then(
