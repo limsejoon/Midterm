@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { concepts } from '@/db/schema';
 import { extractConceptsFromImage } from '@/ai/extract-concepts';
+import { normalizeImageForAI } from '@/lib/normalize-image';
 
 export async function extractConceptsFromImageAction(formData: FormData): Promise<string[]> {
   const file = formData.get('image');
@@ -11,8 +12,8 @@ export async function extractConceptsFromImageAction(formData: FormData): Promis
     throw new Error('이미지 파일이 필요합니다.');
   }
   const arrayBuffer = await file.arrayBuffer();
-  const base64 = Buffer.from(arrayBuffer).toString('base64');
-  return extractConceptsFromImage(base64, file.type);
+  const { base64, mediaType } = await normalizeImageForAI(Buffer.from(arrayBuffer), file.type);
+  return extractConceptsFromImage(base64, mediaType);
 }
 
 export async function saveConceptsAction(bookId: number, names: string[]): Promise<{ added: number }> {

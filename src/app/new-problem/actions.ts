@@ -5,6 +5,7 @@ import { getDb } from '@/db';
 import { concepts, problems, variants } from '@/db/schema';
 import { extractProblemFromImage, type ExtractedProblem } from '@/ai/extract-problem';
 import { generateVariants } from '@/ai/generate-variants';
+import { normalizeImageForAI } from '@/lib/normalize-image';
 
 const VARIANT_COUNT = 3;
 
@@ -25,8 +26,8 @@ export async function extractFromImageAction(formData: FormData, bookId: number)
   ).map((r) => r.name);
 
   const arrayBuffer = await file.arrayBuffer();
-  const base64 = Buffer.from(arrayBuffer).toString('base64');
-  return extractProblemFromImage(base64, file.type, existingConcepts);
+  const { base64, mediaType } = await normalizeImageForAI(Buffer.from(arrayBuffer), file.type);
+  return extractProblemFromImage(base64, mediaType, existingConcepts);
 }
 
 export async function saveProblemAction(
