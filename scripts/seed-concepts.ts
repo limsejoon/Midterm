@@ -17,6 +17,8 @@ const CONCEPT_NAMES = [
   // lesson exists; confirmed via actual page 05 = 음운 축약, 탈락, 첨가).
   '음운 변동 - 음운 동화',
   '음운 변동 - 음운 축약, 탈락, 첨가',
+  // another "3단계 실력 향상 문제" combined review, this time for 03+04+05
+  '음운 변동 - 실력 향상 문제',
   '품사 - 체언',
   '품사 - 용언',
   '품사 - 수식언',
