@@ -82,14 +82,14 @@ export default function NewConceptsPage() {
   }
 
   return (
-    <main className="mx-auto max-w-xl p-6">
-      <h1 className="mb-4 text-xl font-bold">문제집 목차 등록</h1>
+    <main className="mx-auto flex w-full max-w-xl flex-col gap-6 p-14">
+      <h1 className="font-serif text-2xl font-bold text-ink">문제집 목차 등록</h1>
 
-      <label className="block">
-        <span className="text-sm">문제집</span>
+      <label className="flex flex-col gap-1.5">
+        <span className="text-sm font-semibold text-ink-soft">문제집</span>
         {bookId !== null && books.length > 0 && (
           <select
-            className="mt-1 w-full border p-2"
+            className="rounded-xl border border-line bg-surface p-2.5 text-ink focus:border-accent focus:outline-none"
             value={bookId}
             onChange={(e) => setBookId(Number(e.target.value))}
           >
@@ -102,14 +102,18 @@ export default function NewConceptsPage() {
         )}
       </label>
 
-      <div className="mt-2 flex gap-2">
+      <div className="flex gap-2">
         <input
-          className="flex-1 border p-2"
+          className="flex-1 rounded-xl border border-line bg-surface p-2.5 text-ink focus:border-accent focus:outline-none"
           placeholder="새 문제집 이름 (예: 빠작 중등문법)"
           value={newBookName}
           onChange={(e) => setNewBookName(e.target.value)}
         />
-        <button className="rounded border px-3" onClick={handleCreateBook} disabled={busy || !newBookName.trim()}>
+        <button
+          className="shrink-0 rounded-xl border border-line px-4 font-semibold text-ink-soft hover:border-accent disabled:opacity-50"
+          onClick={handleCreateBook}
+          disabled={busy || !newBookName.trim()}
+        >
           + 새 문제집 추가
         </button>
       </div>
@@ -117,9 +121,9 @@ export default function NewConceptsPage() {
       {bookId !== null && (
         <>
           {existingConcepts.length > 0 && (
-            <div className="mt-6">
-              <h2 className="mb-2 font-semibold">이미 등록된 목차</h2>
-              <ul className="space-y-1 text-sm text-gray-700">
+            <div className="flex flex-col gap-2">
+              <h2 className="text-sm font-bold text-ink-soft">이미 등록된 목차</h2>
+              <ul className="flex flex-col gap-1 rounded-2xl border border-line bg-surface p-4 text-sm text-ink-soft">
                 {existingConcepts.map((c) => (
                   <li key={c.id}>{c.name}</li>
                 ))}
@@ -127,50 +131,50 @@ export default function NewConceptsPage() {
             </div>
           )}
 
-          <div className="mt-6">
-            <h2 className="mb-2 font-semibold">새로 추가할 항목</h2>
-            <p className="mb-2 text-sm text-gray-500">
-              목차 사진을 한 장씩 올려보세요. 여러 장을 올리면 목록에 계속 추가됩니다.
-            </p>
+          <div className="flex flex-col gap-3">
+            <div>
+              <h2 className="text-sm font-bold text-ink-soft">새로 추가할 항목</h2>
+              <p className="mt-1 text-sm text-muted">
+                목차 사진을 한 장씩 올려보세요. 여러 장을 올리면 목록에 계속 추가됩니다.
+              </p>
+            </div>
 
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={handleFileChange}
-              disabled={busy}
-            />
-            {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-            {busy && <p className="mt-2 text-sm text-gray-500">처리 중...</p>}
+            <input type="file" accept="image/*" capture="environment" onChange={handleFileChange} disabled={busy} />
+            {error && <p className="text-sm text-danger">{error}</p>}
+            {busy && <p className="text-sm text-muted">처리 중...</p>}
 
-            <ul className="mt-4 space-y-2">
+            <ul className="flex flex-col gap-2">
               {names.map((name, i) => (
                 <li key={i} className="flex gap-2">
                   <input
-                    className="flex-1 border p-2"
+                    className="flex-1 rounded-xl border border-line bg-surface p-2.5 text-ink focus:border-accent focus:outline-none"
                     value={name}
                     onChange={(e) => updateName(i, e.target.value)}
                   />
-                  <button className="rounded border px-3" onClick={() => removeName(i)}>
+                  <button
+                    className="shrink-0 rounded-xl border border-line px-3 text-ink-soft hover:border-danger hover:text-danger"
+                    onClick={() => removeName(i)}
+                  >
                     삭제
                   </button>
                 </li>
               ))}
             </ul>
 
-            <button className="mt-3 rounded border px-3 py-1" onClick={() => setNames((prev) => [...prev, ''])}>
+            <button
+              className="self-start rounded-xl border border-line px-3 py-1.5 text-sm font-semibold text-ink-soft hover:border-accent"
+              onClick={() => setNames((prev) => [...prev, ''])}
+            >
               + 직접 추가
             </button>
 
-            <div className="mt-6">
-              <button
-                className="rounded bg-blue-600 px-4 py-2 text-white disabled:opacity-50"
-                onClick={handleSave}
-                disabled={busy || names.every((n) => !n.trim())}
-              >
-                저장
-              </button>
-            </div>
+            <button
+              className="mt-2 self-start rounded-xl bg-accent px-5 py-2.5 font-semibold text-white disabled:opacity-50"
+              onClick={handleSave}
+              disabled={busy || names.every((n) => !n.trim())}
+            >
+              저장
+            </button>
           </div>
         </>
       )}

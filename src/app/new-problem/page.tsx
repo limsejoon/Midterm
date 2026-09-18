@@ -95,19 +95,19 @@ export default function NewProblemPage() {
 
   if (books === null) {
     return (
-      <main className="mx-auto max-w-xl p-6">
-        <p className="text-sm text-gray-500">불러오는 중...</p>
+      <main className="mx-auto max-w-xl p-14">
+        <p className="text-sm text-muted">불러오는 중...</p>
       </main>
     );
   }
 
   if (books.length === 0) {
     return (
-      <main className="mx-auto max-w-xl p-6">
-        <h1 className="mb-4 text-xl font-bold">새 문제 등록</h1>
-        <p className="text-sm text-gray-700">
+      <main className="mx-auto flex w-full max-w-xl flex-col gap-4 p-14">
+        <h1 className="font-serif text-2xl font-bold text-ink">새 문제 등록</h1>
+        <p className="text-sm text-ink-soft">
           아직 등록된 문제집이 없어요.{' '}
-          <Link href="/concepts/new" className="text-blue-600 underline">
+          <Link href="/concepts/new" className="font-semibold text-accent underline">
             먼저 문제집 목차를 등록해주세요.
           </Link>
         </p>
@@ -116,14 +116,14 @@ export default function NewProblemPage() {
   }
 
   return (
-    <main className="mx-auto max-w-xl p-6">
-      <h1 className="mb-4 text-xl font-bold">새 문제 등록</h1>
+    <main className="mx-auto flex w-full max-w-xl flex-col gap-6 p-14">
+      <h1 className="font-serif text-2xl font-bold text-ink">새 문제 등록</h1>
 
       {books.length > 1 && (
-        <label className="mb-4 block">
-          <span className="text-sm">문제집</span>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-semibold text-ink-soft">문제집</span>
           <select
-            className="mt-1 w-full border p-2"
+            className="rounded-xl border border-line bg-surface p-2.5 text-ink focus:border-accent focus:outline-none"
             value={bookId ?? ''}
             onChange={(e) => setBookId(Number(e.target.value))}
           >
@@ -142,32 +142,36 @@ export default function NewProblemPage() {
       {bookId !== null && step === 'upload' && (
         <div>
           <input type="file" accept="image/*" capture="environment" onChange={handleFileChange} disabled={busy} />
-          {busy && <p className="mt-2 text-sm text-gray-500">인식 중...</p>}
+          {busy && <p className="mt-2 text-sm text-muted">인식 중...</p>}
         </div>
       )}
 
       {step === 'confirm' && (
-        <div className="space-y-3">
-          {extractError && <p className="text-sm text-red-600">{extractError}</p>}
+        <div className="flex flex-col gap-4">
+          {extractError && <p className="text-sm text-danger">{extractError}</p>}
 
-          <label className="block">
-            <span className="text-sm">문법 개념</span>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm font-semibold text-ink-soft">문법 개념</span>
             {useNewConceptInput ? (
               <div className="flex gap-2">
                 <input
-                  className="flex-1 border p-2"
+                  className="flex-1 rounded-xl border border-line bg-surface p-2.5 text-ink focus:border-accent focus:outline-none"
                   value={draft.conceptName}
                   onChange={(e) => setDraft({ ...draft, conceptName: e.target.value })}
                 />
                 {conceptOptions.length > 0 && (
-                  <button type="button" className="rounded border px-3" onClick={() => setUseNewConceptInput(false)}>
+                  <button
+                    type="button"
+                    className="shrink-0 rounded-xl border border-line px-3 text-sm font-semibold text-ink-soft hover:border-accent"
+                    onClick={() => setUseNewConceptInput(false)}
+                  >
                     목록에서 선택
                   </button>
                 )}
               </div>
             ) : (
               <select
-                className="w-full border p-2"
+                className="rounded-xl border border-line bg-surface p-2.5 text-ink focus:border-accent focus:outline-none"
                 value={draft.conceptName}
                 onChange={(e) => {
                   if (e.target.value === '__new__') {
@@ -189,10 +193,10 @@ export default function NewProblemPage() {
             )}
           </label>
 
-          <label className="block">
-            <span className="text-sm">형식</span>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm font-semibold text-ink-soft">형식</span>
             <select
-              className="w-full border p-2"
+              className="rounded-xl border border-line bg-surface p-2.5 text-ink focus:border-accent focus:outline-none"
               value={draft.type}
               onChange={(e) => setDraft({ ...draft, type: e.target.value as ExtractedProblem['type'] })}
             >
@@ -202,22 +206,22 @@ export default function NewProblemPage() {
             </select>
           </label>
 
-          <label className="block">
-            <span className="text-sm">문제</span>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm font-semibold text-ink-soft">문제</span>
             <textarea
-              className="w-full border p-2"
+              className="rounded-xl border border-line bg-surface p-2.5 text-ink focus:border-accent focus:outline-none"
               value={draft.questionText}
               onChange={(e) => setDraft({ ...draft, questionText: e.target.value })}
             />
           </label>
 
           {draft.type === 'multiple_choice' && (
-            <div>
-              <span className="text-sm">보기</span>
+            <div className="flex flex-col gap-1.5">
+              <span className="text-sm font-semibold text-ink-soft">보기</span>
               {(draft.choices ?? ['', '', '', '']).map((choice, i) => (
                 <input
                   key={i}
-                  className="mb-1 w-full border p-2"
+                  className="rounded-xl border border-line bg-surface p-2.5 text-ink focus:border-accent focus:outline-none"
                   value={choice}
                   onChange={(e) => {
                     const choices = [...(draft.choices ?? ['', '', '', ''])];
@@ -229,22 +233,26 @@ export default function NewProblemPage() {
             </div>
           )}
 
-          <label className="block">
-            <span className="text-sm">정답</span>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm font-semibold text-ink-soft">정답</span>
             <input
-              className="w-full border p-2"
+              className="rounded-xl border border-line bg-surface p-2.5 text-ink focus:border-accent focus:outline-none"
               value={draft.correctAnswer}
               onChange={(e) => setDraft({ ...draft, correctAnswer: e.target.value })}
             />
           </label>
 
-          <label className="block">
-            <span className="text-sm">출처 (선택, 예: 3단원 12번)</span>
-            <input className="w-full border p-2" value={sourceNote} onChange={(e) => setSourceNote(e.target.value)} />
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm font-semibold text-ink-soft">출처 (선택, 예: 3단원 12번)</span>
+            <input
+              className="rounded-xl border border-line bg-surface p-2.5 text-ink focus:border-accent focus:outline-none"
+              value={sourceNote}
+              onChange={(e) => setSourceNote(e.target.value)}
+            />
           </label>
 
           <button
-            className="rounded bg-blue-600 px-4 py-2 text-white disabled:opacity-50"
+            className="self-start rounded-xl bg-accent px-5 py-2.5 font-semibold text-white disabled:opacity-50"
             onClick={handleConfirm}
             disabled={busy || !draft.conceptName || !draft.questionText || !draft.correctAnswer}
           >
@@ -254,13 +262,13 @@ export default function NewProblemPage() {
       )}
 
       {step === 'generating' && (
-        <div>
-          <p>대체 문제를 만드는 중...</p>
+        <div className="flex flex-col gap-2">
+          <p className="text-sm text-ink-soft">대체 문제를 만드는 중...</p>
           {generateError && (
-            <div className="mt-2">
-              <p className="text-sm text-red-600">{generateError}</p>
+            <div className="flex flex-col gap-2">
+              <p className="text-sm text-danger">{generateError}</p>
               <button
-                className="mt-2 rounded bg-blue-600 px-4 py-2 text-white"
+                className="self-start rounded-xl bg-accent px-4 py-2 font-semibold text-white"
                 onClick={() => problemId && runGeneration(problemId)}
               >
                 다시 시도

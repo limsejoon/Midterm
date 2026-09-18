@@ -23,44 +23,50 @@ export default async function HistoryPage() {
   const accuracy = computeConceptAccuracy(rows);
 
   return (
-    <main className="mx-auto max-w-xl p-6">
-      <h1 className="mb-4 text-xl font-bold">학습 기록</h1>
+    <main className="mx-auto flex w-full max-w-2xl flex-col gap-10 p-14">
+      <h1 className="font-serif text-2xl font-bold text-ink">학습 기록</h1>
 
-      <h2 className="mb-2 font-semibold">개념별 정답률</h2>
-      <table className="mb-6 w-full border-collapse text-sm">
-        <thead>
-          <tr className="border-b text-left">
-            <th className="py-1">개념</th>
-            <th className="py-1">정답률</th>
-          </tr>
-        </thead>
-        <tbody>
-          {accuracy.map((a) => (
-            <tr key={a.conceptName} className="border-b">
-              <td className="py-1">{a.conceptName}</td>
-              <td className="py-1">
-                {a.correct}/{a.total} ({Math.round((a.correct / a.total) * 100)}%)
-              </td>
-            </tr>
+      <div className="flex flex-col gap-3">
+        <h2 className="text-sm font-bold text-ink-soft">개념별 정답률</h2>
+        <div className="overflow-hidden rounded-2xl border border-line bg-surface">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-line bg-sidebar text-left">
+                <th className="px-5 py-3 font-semibold text-ink-soft">개념</th>
+                <th className="px-5 py-3 font-semibold text-ink-soft">정답률</th>
+              </tr>
+            </thead>
+            <tbody>
+              {accuracy.map((a) => (
+                <tr key={a.conceptName} className="border-b border-line last:border-none">
+                  <td className="px-5 py-3 text-ink">{a.conceptName}</td>
+                  <td className="px-5 py-3 text-ink-soft">
+                    {a.correct}/{a.total} ({Math.round((a.correct / a.total) * 100)}%)
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <h2 className="text-sm font-bold text-ink-soft">최근 풀이</h2>
+        <ul className="flex flex-col gap-2.5">
+          {rows.map((r) => (
+            <li key={r.attemptId} className="rounded-2xl border border-line bg-surface p-4 text-sm">
+              <div className="text-muted">
+                {r.conceptName} · {new Date(r.solvedAt).toLocaleString('ko-KR')}
+              </div>
+              <div className="mt-1 text-ink">{r.questionText}</div>
+              <div className={`mt-1 font-semibold ${r.isCorrect ? 'text-ok' : 'text-danger'}`}>
+                {r.isCorrect ? '정답' : '오답'}
+                {r.gradedBy === 'ai_judged' ? ' (AI 채점)' : ''}
+              </div>
+            </li>
           ))}
-        </tbody>
-      </table>
-
-      <h2 className="mb-2 font-semibold">최근 풀이</h2>
-      <ul className="space-y-2">
-        {rows.map((r) => (
-          <li key={r.attemptId} className="rounded border p-2 text-sm">
-            <div className="text-gray-500">
-              {r.conceptName} · {new Date(r.solvedAt).toLocaleString('ko-KR')}
-            </div>
-            <div>{r.questionText}</div>
-            <div className={r.isCorrect ? 'text-green-600' : 'text-red-600'}>
-              {r.isCorrect ? '정답' : '오답'}
-              {r.gradedBy === 'ai_judged' ? ' (AI 채점)' : ''}
-            </div>
-          </li>
-        ))}
-      </ul>
+        </ul>
+      </div>
     </main>
   );
 }
