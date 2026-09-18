@@ -9,7 +9,10 @@ type Row = {
   questionText: string;
   type: 'multiple_choice' | 'short_answer' | 'ox';
   choices: string[] | null;
+  correctAnswer: string;
   isCorrect: boolean | null;
+  submittedAnswer: string | null;
+  mistakeAnalysis: string | null;
 };
 
 export default function ConceptPracticePanel({ conceptName, rows }: { conceptName: string; rows: Row[] }) {
@@ -24,6 +27,16 @@ export default function ConceptPracticePanel({ conceptName, rows }: { conceptNam
   const active = rows.find((r) => r.variantId === selected);
 
   if (active) {
+    const alreadySolved =
+      active.isCorrect !== null && active.submittedAnswer !== null
+        ? {
+            submittedAnswer: active.submittedAnswer,
+            isCorrect: active.isCorrect,
+            correctAnswer: active.correctAnswer,
+            mistakeAnalysis: active.mistakeAnalysis,
+          }
+        : null;
+
     return (
       <div className="flex flex-col gap-4 p-14">
         <button onClick={backToList} className="flex w-fit items-center gap-1.5 text-sm font-semibold text-ink-soft hover:text-ink">
@@ -39,6 +52,7 @@ export default function ConceptPracticePanel({ conceptName, rows }: { conceptNam
           questionText={active.questionText}
           choices={active.choices}
           onDone={backToList}
+          initial={alreadySolved}
         />
       </div>
     );

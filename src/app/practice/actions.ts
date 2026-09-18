@@ -28,6 +28,22 @@ export async function submitAnswerAction(
   submittedAnswer: string,
 ): Promise<SubmitAnswerResult> {
   const db = getDb();
+
+  // idempotent: a variant that already has an attempt is re-graded/re-analyzed here,
+  // never resubmitted — otherwise a repeat wrong answer would spawn another round of
+  // follow-up variants every time
+  const [existing] = await db.select().from(attempts).where(eq(attempts.variantId, variantId));
+  if (existing) {
+    return {
+      isCorrect: existing.isCorrect,
+      correctAnswer: (await loadVariantAndConcept(variantId)).variant.correctAnswer,
+      gradedBy: existing.gradedBy,
+      attemptId: existing.id,
+      needsExplanation: false,
+      mistakeAnalysis: existing.mistakeAnalysis,
+    };
+  }
+
   const { variant, concept } = await loadVariantAndConcept(variantId);
 
   const result = await gradeAttempt({

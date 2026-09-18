@@ -22,28 +22,42 @@ export default async function ConceptProblemsPage({
       questionText: variants.questionText,
       type: variants.type,
       choices: variants.choices,
+      correctAnswer: variants.correctAnswer,
     })
     .from(variants)
     .where(eq(variants.conceptId, conceptId))
     .orderBy(asc(variants.id));
 
-  // a variant can in principle be attempted more than once; use the most recent attempt's result
+  // a variant is only ever attempted once now (submitAnswerAction is idempotent), but
+  // keep taking the latest row defensively rather than assuming exactly one
   const attemptRows = await db
-    .select({ variantId: attempts.variantId, isCorrect: attempts.isCorrect, solvedAt: attempts.solvedAt })
+    .select({
+      variantId: attempts.variantId,
+      submittedAnswer: attempts.submittedAnswer,
+      isCorrect: attempts.isCorrect,
+      mistakeAnalysis: attempts.mistakeAnalysis,
+      solvedAt: attempts.solvedAt,
+    })
     .from(attempts)
     .orderBy(asc(attempts.solvedAt));
-  const latestAttempt = new Map<number, boolean>();
+  const latestAttempt = new Map<number, (typeof attemptRows)[number]>();
   for (const a of attemptRows) {
-    latestAttempt.set(a.variantId, a.isCorrect); // later rows overwrite earlier ones
+    latestAttempt.set(a.variantId, a); // later rows overwrite earlier ones
   }
 
-  const rows = conceptVariants.map((v) => ({
-    variantId: v.variantId,
-    questionText: v.questionText,
-    type: v.type,
-    choices: v.choices,
-    isCorrect: latestAttempt.has(v.variantId) ? latestAttempt.get(v.variantId)! : null,
-  }));
+  const rows = conceptVariants.map((v) => {
+    const attempt = latestAttempt.get(v.variantId) ?? null;
+    return {
+      variantId: v.variantId,
+      questionText: v.questionText,
+      type: v.type,
+      choices: v.choices,
+      correctAnswer: v.correctAnswer,
+      isCorrect: attempt?.isCorrect ?? null,
+      submittedAnswer: attempt?.submittedAnswer ?? null,
+      mistakeAnalysis: attempt?.mistakeAnalysis ?? null,
+    };
+  });
 
   return <ConceptPracticePanel conceptName={concept.name} rows={rows} />;
 }

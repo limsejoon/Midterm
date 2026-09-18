@@ -3,21 +3,41 @@
 import { useState } from 'react';
 import { submitAnswerAction, submitExplanationAction, type SubmitAnswerResult } from './actions';
 
+type PreviousResult = {
+  submittedAnswer: string;
+  isCorrect: boolean;
+  correctAnswer: string;
+  mistakeAnalysis: string | null;
+};
+
 type Props = {
   variantId: number;
   type: 'multiple_choice' | 'short_answer' | 'ox';
   questionText: string;
   choices: string[] | null;
   onDone: () => void;
+  /** already-recorded result for a variant that was solved before; renders read-only, no resubmission */
+  initial?: PreviousResult | null;
 };
 
 const LETTERS = ['①', '②', '③', '④', '⑤', '⑥'];
 
-export default function SolveForm({ variantId, type, questionText, choices, onDone }: Props) {
-  const [answer, setAnswer] = useState('');
-  const [result, setResult] = useState<SubmitAnswerResult | null>(null);
+export default function SolveForm({ variantId, type, questionText, choices, onDone, initial }: Props) {
+  const [answer, setAnswer] = useState(initial?.submittedAnswer ?? '');
+  const [result, setResult] = useState<SubmitAnswerResult | null>(
+    initial
+      ? {
+          isCorrect: initial.isCorrect,
+          correctAnswer: initial.correctAnswer,
+          gradedBy: 'exact',
+          attemptId: -1,
+          needsExplanation: false,
+          mistakeAnalysis: initial.mistakeAnalysis,
+        }
+      : null,
+  );
   const [explanation, setExplanation] = useState('');
-  const [mistakeAnalysis, setMistakeAnalysis] = useState<string | null>(null);
+  const [mistakeAnalysis, setMistakeAnalysis] = useState<string | null>(initial?.mistakeAnalysis ?? null);
   const [busy, setBusy] = useState(false);
 
   async function submit(value: string) {
