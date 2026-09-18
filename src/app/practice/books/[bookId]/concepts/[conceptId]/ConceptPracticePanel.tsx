@@ -70,13 +70,13 @@ export default function ConceptPracticePanel({ conceptName, rows }: { conceptNam
       {rows.length === 0 && <p className="text-sm text-muted">등록된 문제가 없어요.</p>}
 
       <div className="flex flex-col gap-2.5">
-        {rows.map((r) => (
+        {rows.map((r, i) => (
           <button
             key={r.variantId}
             onClick={() => setSelected(r.variantId)}
             className="flex items-center justify-between gap-4 rounded-2xl border border-line bg-surface px-5 py-4 text-left hover:border-accent"
           >
-            <span className="text-[15px] text-ink">{r.questionText}</span>
+            <span className="text-[15px] font-semibold text-ink">문제 {i + 1}</span>
             <span
               className={`shrink-0 text-xs font-bold ${
                 r.isCorrect === null ? 'text-muted' : r.isCorrect ? 'text-ok' : 'text-danger'
