@@ -14,3 +14,14 @@ export function shuffleChoices<T>(items: T[]): T[] {
   }
   return result;
 }
+
+// simple items (OX, 2-choice) skip asking the child to explain their reasoning;
+// deeper items (3+ choice multiple choice, short answer) ask for it before analyzing the mistake
+export function needsMistakeExplanation(
+  type: 'multiple_choice' | 'short_answer' | 'ox',
+  choices: string[] | null,
+): boolean {
+  if (type === 'ox') return false;
+  if (type === 'multiple_choice') return (choices?.length ?? 0) >= 3;
+  return true;
+}

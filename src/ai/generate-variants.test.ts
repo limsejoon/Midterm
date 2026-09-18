@@ -58,4 +58,19 @@ describe('generateVariants', () => {
     expect(call.output.minItems).toBe(2);
     expect(call.output.maxItems).toBe(2);
   });
+
+  it('includes the focus hint in the prompt when regenerating after a mistake', async () => {
+    vi.mocked(generateText).mockResolvedValue({ output: sampleVariants } as never);
+
+    await generateVariants({
+      conceptName: '부사와 관형사 구분',
+      originalQuestionText: '다음 중 부사인 것은?',
+      originalType: 'multiple_choice',
+      count: 2,
+      focusHint: '관형사와 부사를 헷갈렸어요.',
+    });
+
+    const call = vi.mocked(generateText).mock.calls[0][0] as unknown as { prompt: string };
+    expect(call.prompt).toContain('관형사와 부사를 헷갈렸어요.');
+  });
 });

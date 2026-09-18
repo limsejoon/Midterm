@@ -8,6 +8,7 @@ import {
   jsonb,
   boolean,
   timestamp,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 
 export const problemTypeEnum = pgEnum('problem_type', [
@@ -49,6 +50,8 @@ export const variants = pgTable('variants', {
   questionText: text('question_text').notNull(),
   choices: jsonb('choices').$type<string[] | null>(),
   correctAnswer: text('correct_answer').notNull(),
+  // set only for follow-up variants generated after a wrong attempt; null for the initial batch
+  sourceAttemptId: integer('source_attempt_id').references((): AnyPgColumn => attempts.id),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
@@ -60,5 +63,9 @@ export const attempts = pgTable('attempts', {
   submittedAnswer: text('submitted_answer').notNull(),
   isCorrect: boolean('is_correct').notNull(),
   gradedBy: gradedByEnum('graded_by').notNull(),
+  // child's explanation of why they thought their (wrong) answer was correct; null when not asked
+  mistakeExplanation: text('mistake_explanation'),
+  // AI's analysis of why the answer was likely wrong; null when correct
+  mistakeAnalysis: text('mistake_analysis'),
   solvedAt: timestamp('solved_at').notNull().defaultNow(),
 });
