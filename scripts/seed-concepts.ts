@@ -7,6 +7,9 @@ const BOOK_NAME = '빠작 중등문법';
 const CONCEPT_NAMES = [
   '음운 체계 - 모음 체계',
   '음운 체계 - 자음 체계',
+  // not in the table of contents — this is a "3단계 실력 향상 문제" combined
+  // review section that follows 01+02 in the book itself
+  '음운 체계 - 실력 향상 문제',
   '음운 변동 - 음절의 끝소리 규칙',
   '음운 변동 - 자음군 단순화',
   '음운 변동 - 음운 축약, 탈락, 첨가',
