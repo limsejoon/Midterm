@@ -8,6 +8,7 @@ import {
   jsonb,
   boolean,
   timestamp,
+  unique,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 
@@ -19,11 +20,25 @@ export const problemTypeEnum = pgEnum('problem_type', [
 
 export const gradedByEnum = pgEnum('graded_by', ['exact', 'ai_judged']);
 
-export const concepts = pgTable('concepts', {
+export const books = pgTable('books', {
   id: serial('id').primaryKey(),
   name: varchar('name', { length: 255 }).notNull().unique(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
+
+export const concepts = pgTable(
+  'concepts',
+  {
+    id: serial('id').primaryKey(),
+    bookId: integer('book_id')
+      .notNull()
+      .references(() => books.id),
+    name: varchar('name', { length: 255 }).notNull(),
+    orderIndex: integer('order_index').notNull().default(0),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => [unique('concepts_book_id_name_unique').on(table.bookId, table.name)],
+);
 
 export const problems = pgTable('problems', {
   id: serial('id').primaryKey(),

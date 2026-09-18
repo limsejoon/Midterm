@@ -15,15 +15,20 @@ export async function extractConceptsFromImageAction(formData: FormData): Promis
   return extractConceptsFromImage(base64, file.type);
 }
 
-export async function saveConceptsAction(names: string[]): Promise<{ added: number }> {
+export async function saveConceptsAction(bookId: number, names: string[]): Promise<{ added: number }> {
   const db = getDb();
+
+  const existing = await db.select({ name: concepts.name }).from(concepts).where(eq(concepts.bookId, bookId));
+  const existingNames = new Set(existing.map((r) => r.name));
+  let nextOrderIndex = existing.length;
+
   let added = 0;
   for (const rawName of names) {
     const name = rawName.trim();
-    if (!name) continue;
-    const [existing] = await db.select().from(concepts).where(eq(concepts.name, name));
-    if (existing) continue;
-    await db.insert(concepts).values({ name });
+    if (!name || existingNames.has(name)) continue;
+    await db.insert(concepts).values({ bookId, name, orderIndex: nextOrderIndex });
+    existingNames.add(name);
+    nextOrderIndex += 1;
     added += 1;
   }
   return { added };

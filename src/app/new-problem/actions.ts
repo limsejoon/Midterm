@@ -1,6 +1,6 @@
 'use server';
 
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { concepts, problems, variants } from '@/db/schema';
 import { extractProblemFromImage, type ExtractedProblem } from '@/ai/extract-problem';
@@ -8,19 +8,21 @@ import { generateVariants } from '@/ai/generate-variants';
 
 const VARIANT_COUNT = 3;
 
-export async function getConceptNamesAction(): Promise<string[]> {
+export async function getConceptNamesForBookAction(bookId: number): Promise<string[]> {
   const db = getDb();
-  const rows = await db.select({ name: concepts.name }).from(concepts);
+  const rows = await db.select({ name: concepts.name }).from(concepts).where(eq(concepts.bookId, bookId));
   return rows.map((r) => r.name);
 }
 
-export async function extractFromImageAction(formData: FormData): Promise<ExtractedProblem> {
+export async function extractFromImageAction(formData: FormData, bookId: number): Promise<ExtractedProblem> {
   const file = formData.get('image');
   if (!(file instanceof File)) {
     throw new Error('이미지 파일이 필요합니다.');
   }
   const db = getDb();
-  const existingConcepts = (await db.select({ name: concepts.name }).from(concepts)).map((r) => r.name);
+  const existingConcepts = (
+    await db.select({ name: concepts.name }).from(concepts).where(eq(concepts.bookId, bookId))
+  ).map((r) => r.name);
 
   const arrayBuffer = await file.arrayBuffer();
   const base64 = Buffer.from(arrayBuffer).toString('base64');
@@ -28,13 +30,20 @@ export async function extractFromImageAction(formData: FormData): Promise<Extrac
 }
 
 export async function saveProblemAction(
-  data: ExtractedProblem & { sourceNote: string },
+  data: ExtractedProblem & { sourceNote: string; bookId: number },
 ): Promise<{ problemId: number; conceptName: string }> {
   const db = getDb();
 
-  let [concept] = await db.select().from(concepts).where(eq(concepts.name, data.conceptName));
+  let [concept] = await db
+    .select()
+    .from(concepts)
+    .where(and(eq(concepts.bookId, data.bookId), eq(concepts.name, data.conceptName)));
   if (!concept) {
-    [concept] = await db.insert(concepts).values({ name: data.conceptName }).returning();
+    const existing = await db.select({ id: concepts.id }).from(concepts).where(eq(concepts.bookId, data.bookId));
+    [concept] = await db
+      .insert(concepts)
+      .values({ bookId: data.bookId, name: data.conceptName, orderIndex: existing.length })
+      .returning();
   }
 
   const [problem] = await db

@@ -6,7 +6,7 @@ export default function Home() {
       <h1 className="mb-6 text-2xl font-bold">국어 문법 대체 문제</h1>
       <nav className="flex flex-col gap-3">
         <Link href="/concepts/new" className="rounded border p-4 hover:bg-gray-50">
-          목차로 개념 목록 등록
+          문제집 목차 등록
         </Link>
         <Link href="/new-problem" className="rounded border p-4 hover:bg-gray-50">
           새 문제 등록

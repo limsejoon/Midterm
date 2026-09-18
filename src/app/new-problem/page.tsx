@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { getBooksAction } from '@/app/books/actions';
 import {
-  getConceptNamesAction,
+  getConceptNamesForBookAction,
   extractFromImageAction,
   saveProblemAction,
   generateVariantsForProblemAction,
@@ -11,6 +13,7 @@ import {
 import type { ExtractedProblem } from '@/ai/extract-problem';
 
 type Step = 'upload' | 'confirm' | 'generating';
+type Book = { id: number; name: string };
 
 const emptyDraft: ExtractedProblem = {
   conceptName: '',
@@ -22,6 +25,8 @@ const emptyDraft: ExtractedProblem = {
 
 export default function NewProblemPage() {
   const router = useRouter();
+  const [books, setBooks] = useState<Book[] | null>(null);
+  const [bookId, setBookId] = useState<number | null>(null);
   const [step, setStep] = useState<Step>('upload');
   const [draft, setDraft] = useState<ExtractedProblem>(emptyDraft);
   const [sourceNote, setSourceNote] = useState('');
@@ -33,18 +38,26 @@ export default function NewProblemPage() {
   const [useNewConceptInput, setUseNewConceptInput] = useState(false);
 
   useEffect(() => {
-    getConceptNamesAction().then(setConceptOptions);
+    getBooksAction().then((loaded) => {
+      setBooks(loaded);
+      if (loaded.length === 1) setBookId(loaded[0].id);
+    });
   }, []);
+
+  useEffect(() => {
+    if (bookId === null) return;
+    getConceptNamesForBookAction(bookId).then(setConceptOptions);
+  }, [bookId]);
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || bookId === null) return;
     setBusy(true);
     setExtractError(null);
     const formData = new FormData();
     formData.set('image', file);
     try {
-      const extracted = await extractFromImageAction(formData);
+      const extracted = await extractFromImageAction(formData, bookId);
       setDraft(extracted);
       setUseNewConceptInput(!conceptOptions.includes(extracted.conceptName));
     } catch {
@@ -58,9 +71,10 @@ export default function NewProblemPage() {
   }
 
   async function handleConfirm() {
+    if (bookId === null) return;
     setBusy(true);
     try {
-      const { problemId: id } = await saveProblemAction({ ...draft, sourceNote });
+      const { problemId: id } = await saveProblemAction({ ...draft, sourceNote, bookId });
       setProblemId(id);
       setStep('generating');
       await runGeneration(id);
@@ -79,11 +93,53 @@ export default function NewProblemPage() {
     }
   }
 
+  if (books === null) {
+    return (
+      <main className="mx-auto max-w-xl p-6">
+        <p className="text-sm text-gray-500">불러오는 중...</p>
+      </main>
+    );
+  }
+
+  if (books.length === 0) {
+    return (
+      <main className="mx-auto max-w-xl p-6">
+        <h1 className="mb-4 text-xl font-bold">새 문제 등록</h1>
+        <p className="text-sm text-gray-700">
+          아직 등록된 문제집이 없어요.{' '}
+          <Link href="/concepts/new" className="text-blue-600 underline">
+            먼저 문제집 목차를 등록해주세요.
+          </Link>
+        </p>
+      </main>
+    );
+  }
+
   return (
     <main className="mx-auto max-w-xl p-6">
       <h1 className="mb-4 text-xl font-bold">새 문제 등록</h1>
 
-      {step === 'upload' && (
+      {books.length > 1 && (
+        <label className="mb-4 block">
+          <span className="text-sm">문제집</span>
+          <select
+            className="mt-1 w-full border p-2"
+            value={bookId ?? ''}
+            onChange={(e) => setBookId(Number(e.target.value))}
+          >
+            <option value="" disabled>
+              선택하세요
+            </option>
+            {books.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      {bookId !== null && step === 'upload' && (
         <div>
           <input type="file" accept="image/*" capture="environment" onChange={handleFileChange} disabled={busy} />
           {busy && <p className="mt-2 text-sm text-gray-500">인식 중...</p>}
