@@ -13,10 +13,9 @@ const CONCEPT_NAMES = [
   '음운 변동 - 음절의 끝소리 규칙',
   // also not in the table of contents by this name — the book's own page
   // header says "04 음운 동화" (비음화/유음화/구개음화), contradicting the
-  // TOC reading below for 04/05. Order/names past this point are unverified
-  // until confirmed against the actual pages.
+  // original TOC reading (which guessed "자음군 단순화" — dropped, no such
+  // lesson exists; confirmed via actual page 05 = 음운 축약, 탈락, 첨가).
   '음운 변동 - 음운 동화',
-  '음운 변동 - 자음군 단순화',
   '음운 변동 - 음운 축약, 탈락, 첨가',
   '품사 - 체언',
   '품사 - 용언',
