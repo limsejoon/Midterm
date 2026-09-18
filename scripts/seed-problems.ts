@@ -38,8 +38,15 @@ async function main() {
   if (!concept) throw new Error(`개념을 찾을 수 없습니다: "${data.concept}"`);
 
   let added = 0;
+  let skipped = 0;
 
   for (const ref of data.referenceProblems) {
+    if (ref.type === 'multiple_choice' && !ref.choices) {
+      console.log(`  ${ref.number}번 → 건너뜀 (객관식인데 choices가 비어있음, 원본 확인 필요)`);
+      skipped += 1;
+      continue;
+    }
+
     const [problem] = await db
       .insert(problems)
       .values({
@@ -65,7 +72,9 @@ async function main() {
     console.log(`  ${ref.number}번 → problem #${problem.id} (바로 풀 수 있음)`);
   }
 
-  console.log(`\n완료: 기본 문제 ${added}개 추가 (개념: "${concept.name}"). 변형 문제는 scripts/seed-variants.ts로 나중에 추가.`);
+  console.log(
+    `\n완료: 기본 문제 ${added}개 추가 (개념: "${concept.name}")${skipped > 0 ? `, ${skipped}개 건너뜀` : ''}. 변형 문제는 scripts/seed-variants.ts로 나중에 추가.`,
+  );
 }
 
 main().then(
