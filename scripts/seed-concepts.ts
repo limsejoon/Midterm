@@ -26,7 +26,9 @@ const CONCEPT_NAMES = [
   // another "3단계 실력 향상 문제" combined review, this time for 06+07+08+09
   '품사 - 실력 향상 문제',
   '단어의 짜임 - 어근과 접사',
-  '단어의 짜임 - 파생어와 합성어',
+  // named "파생어와 합성어" in the original TOC reading — the actual page
+  // title is "단일어와 복합어" (복합어 = 합성어+파생어), corrected
+  '단어의 짜임 - 단일어와 복합어',
   '어휘의 체계와 양상',
   '어휘의 의미 관계 - 반의 관계',
   '어휘의 의미 관계 - 상하 관계, 다의 관계, 동음이의 관계',
