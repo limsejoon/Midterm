@@ -30,7 +30,9 @@ const CONCEPT_NAMES = [
   // title is "단일어와 복합어" (복합어 = 합성어+파생어), corrected
   '단어의 짜임 - 단일어와 복합어',
   '어휘의 체계와 양상',
-  '어휘의 의미 관계 - 반의 관계',
+  // named "반의 관계"만 in the original TOC reading — the actual page (13과)
+  // covers both 유의 관계 and 반의 관계 together, corrected
+  '어휘의 의미 관계 - 유의 관계, 반의 관계',
   '어휘의 의미 관계 - 상하 관계, 다의 관계, 동음이의 관계',
   '문장 성분 - 주성분',
   '문장 성분 - 부속 성분과 독립 성분',
